@@ -38,15 +38,25 @@ func NewNode(operator *Operator, config *Config) *Node {
 }
 
 func (n *Node) newRunner(id RequestID, initMsg *Init) (*Runner, error) {
-	runner := &Runner{
-		Operator:              n.operator,
-		DepositDataSignatures: map[types.OperatorID]*PartialDepositData{},
-		config:                n.config,
-		protocol:              n.config.Protocol(n.config.Network, n.operator.OperatorID, id),
+
+	var i uint16
+	for i0, id := range initMsg.OperatorIDs {
+		if id == n.operator.OperatorID {
+			i = uint16(i0) + 1
+		}
+	}
+	if i == 0 {
+		return nil, errors.New("invalid request")
 	}
 
-	if err := runner.protocol.Start(initMsg); err != nil {
-		return nil, errors.Wrap(err, "could not start dkg protocol")
+	runner := &Runner{
+		Operator:          n.operator,
+		InitMsg:           initMsg,
+		Identifier:        id,
+		I:                 i,
+		PartialSignatures: map[types.OperatorID][]byte{},
+		config:            n.config,
+		keygenSubProtocol: n.config.Protocol(n.operator.OperatorID, id),
 	}
 
 	return runner, nil
@@ -66,6 +76,8 @@ func (n *Node) ProcessMessage(msg *types.SSVMessage) error {
 		return n.startNewDKGMsg(signedMsg)
 	case ProtocolMsgType:
 		return n.processDKGMsg(signedMsg)
+	case PartialSigType:
+		return n.processDKGMsg(signedMsg)
 	default:
 		return errors.New("unknown msg type")
 	}
@@ -84,6 +96,10 @@ func (n *Node) startNewDKGMsg(message *SignedMessage) error {
 
 	// add runner to runners
 	n.runners.AddRunner(message.Message.Identifier, runner)
+	err = runner.Start()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
