@@ -1,0 +1,71 @@
+syntax = "proto3";
+package ssv.dkg.types;
+option go_package = "github.com/bloxapp/ssv-spec/dkg/types";
+
+message MessageHeader {
+  bytes session_id = 1;
+  int32 msg_type = 2;
+  uint64 sender = 3;
+  uint64 receiver = 4;
+}
+
+/*
+ * A generic message.
+ */
+message Message {
+  MessageHeader header = 1;
+  bytes data = 2;
+  bytes signature = 3;
+}
+
+message Init {
+  repeated uint64 operator_ids = 1;
+  uint64 threshold = 2;
+  bytes withdrawal_credentials = 3;
+  bytes fork = 4;
+}
+
+message ParsedInitMessage {
+  MessageHeader header = 1;
+  Init body = 2;
+  bytes signature = 3;
+}
+
+message LocalKeyShare {
+  uint64 index = 1;
+  uint64 threshold = 2;
+  repeated uint64 committee = 3;
+  repeated bytes share_public_keys = 4;
+  bytes public_key = 5;
+  bytes secret_share = 6;
+}
+
+message PartialSigMsgBody {
+  uint64 signer = 1;
+  bytes root = 2;
+  bytes signature = 3;
+}
+
+message ParsedPartialSigMessage {
+  MessageHeader header = 1;
+  PartialSigMsgBody body = 2;
+  bytes signature = 3;
+}
+
+message SignedDepositDataMsgBody {
+  bytes request_id = 1;
+  uint64 operator_id = 2;
+  bytes encrypted_share = 3;
+  repeated uint64 committee = 4;
+  uint64 threshold = 5;
+  bytes validatorPublicKey = 6;
+  bytes withdrawal_credentials = 7;
+  bytes deposit_data_signature = 8;
+  bytes operator_signature = 9;
+}
+
+message ParsedSignedDepositDataMessage {
+  MessageHeader header = 1;
+  SignedDepositDataMsgBody body = 2;
+  bytes signature = 3; // ecdsa signature
+}

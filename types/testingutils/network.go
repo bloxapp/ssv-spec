@@ -1,7 +1,7 @@
 package testingutils
 
 import (
-	"github.com/bloxapp/ssv-spec/dkg"
+	dkgtypes "github.com/bloxapp/ssv-spec/dkg/types"
 	"github.com/bloxapp/ssv-spec/types"
 )
 
@@ -25,11 +25,11 @@ func (net *TestingNetwork) BroadcastDecided(msg types.Encoder) error {
 }
 
 // StreamDKGOutput will stream to any subscriber the result of the DKG
-func (net *TestingNetwork) StreamDKGOutput(output map[types.OperatorID]*dkg.SignedOutput) error {
+func (net *TestingNetwork) StreamDKGOutput(output map[types.OperatorID]*dkgtypes.ParsedSignedDepositDataMessage) error {
 	return nil
 }
 
 // BroadcastDKGMessage will broadcast a msg to the dkg network
-func (net *TestingNetwork) BroadcastDKGMessage(msg *dkg.SignedMessage) error {
+func (net *TestingNetwork) BroadcastDKGMessage(msg *dkgtypes.SignedMessage) error {
 	return nil
 }

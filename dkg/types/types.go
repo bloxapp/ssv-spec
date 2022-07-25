@@ -1,4 +1,4 @@
-package dkg
+package types
 
 import (
 	"crypto/rsa"
@@ -9,9 +9,9 @@ import (
 // Network is a collection of funcs for DKG
 type Network interface {
 	// StreamDKGOutput will stream to any subscriber the result of the DKG
-	StreamDKGOutput(output map[types.OperatorID]*SignedOutput) error
-	// BroadcastDKGMessage will broadcast a msg to the dkg network
-	BroadcastDKGMessage(msg *SignedMessage) error
+	StreamDKGOutput(output map[types.OperatorID]*ParsedSignedDepositDataMessage) error
+	// Broadcast will broadcast a msg to the dkg network
+	Broadcast(msg types.Encoder) error
 }
 
 type Storage interface {
@@ -29,9 +29,18 @@ type Operator struct {
 	EncryptionPubKey *rsa.PublicKey
 }
 
+type ProtocolConfig struct {
+	// Identifier unique for DKG session
+	Identifier    RequestID
+	Operator      *Operator
+	BeaconNetwork types.BeaconNetwork
+	Signer        types.DKGSigner
+}
+
 type Config struct {
 	// Protocol the DKG protocol implementation
-	Protocol            func(network Network, operatorID types.OperatorID, identifier RequestID) KeyGenProtocol
+	Protocol            func(init *Init, operatorID types.OperatorID, identifier RequestID) Protocol
+	BeaconNetwork       types.BeaconNetwork
 	Network             Network
 	Storage             Storage
 	SignatureDomainType types.DomainType
