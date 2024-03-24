@@ -3,7 +3,6 @@ package testingutils
 import (
 	"bytes"
 	"crypto/sha256"
-
 	"github.com/bloxapp/ssv-spec/qbft"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/pkg/errors"
@@ -72,6 +71,7 @@ var ThirteenOperatorsInstance = func() *qbft.Instance {
 var baseInstance = func(share *types.Share, keySet *TestKeySet, identifier []byte) *qbft.Instance {
 	ret := qbft.NewInstance(TestingConfig(keySet), share, identifier, qbft.FirstHeight)
 	ret.StartValue = TestingQBFTFullData
+	ret.CdFetcher = CdFetcher(TestingQBFTFullData)
 	return ret
 }
 
@@ -85,4 +85,11 @@ func NewTestingQBFTController(
 		share,
 		config,
 	)
+}
+
+func CdFetcher(value []byte) *types.DataFetcher {
+	return &types.DataFetcher{
+		GetConsensusData: func() ([]byte, error) {
+			return value, nil
+		}}
 }
