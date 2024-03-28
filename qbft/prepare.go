@@ -2,6 +2,7 @@ package qbft
 
 import (
 	"bytes"
+
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/pkg/errors"
 )
@@ -59,8 +60,7 @@ func getRoundChangeJustification(state *State, config IConfig, prepareMsgContain
 	prepareMsgs := prepareMsgContainer.MessagesForRound(state.LastPreparedRound)
 	ret := make([]*SignedMessage, 0)
 	for _, msg := range prepareMsgs {
-		if err := validSignedPrepareForHeightRoundAndRoot(
-			config,
+		if err := validSignedPrepareForHeightRoundAndRootNoVerification(
 			msg,
 			state.Height,
 			state.LastPreparedRound,
@@ -79,8 +79,7 @@ func getRoundChangeJustification(state *State, config IConfig, prepareMsgContain
 
 // validSignedPrepareForHeightRoundAndRoot known in dafny spec as validSignedPrepareForHeightRoundAndDigest
 // https://entethalliance.github.io/client-spec/qbft_spec.html#dfn-qbftspecification
-func validSignedPrepareForHeightRoundAndRoot(
-	config IConfig,
+func validSignedPrepareForHeightRoundAndRootNoVerification(
 	signedPrepare *SignedMessage,
 	height Height,
 	round Round,
@@ -108,6 +107,26 @@ func validSignedPrepareForHeightRoundAndRoot(
 		return errors.New("msg allows 1 signer")
 	}
 
+	if !signedPrepare.CheckSignersInCommittee(operators) {
+		return errors.New("signers not in committee")
+	}
+
+	return nil
+}
+
+func validSignedPrepareForHeightRoundAndRootWithVerification(
+	config IConfig,
+	signedPrepare *SignedMessage,
+	height Height,
+	round Round,
+	root [32]byte,
+	operators []*types.Operator) error {
+
+	if err := validSignedPrepareForHeightRoundAndRootNoVerification(signedPrepare, height, round, root, operators); err != nil {
+		return err
+	}
+
+	// Verify signature
 	if err := signedPrepare.Signature.VerifyByOperators(signedPrepare, config.GetSignatureDomainType(), types.QBFTSignatureType, operators); err != nil {
 		return errors.Wrap(err, "msg signature invalid")
 	}

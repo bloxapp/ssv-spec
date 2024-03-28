@@ -2,6 +2,7 @@ package qbft
 
 import (
 	"bytes"
+
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/pkg/errors"
 )
@@ -206,7 +207,7 @@ func isReceivedProposalJustification(
 	return nil
 }
 
-func validRoundChangeForData(
+func validRoundChangeForDataNoVerification(
 	state *State,
 	config IConfig,
 	signedMsg *SignedMessage,
@@ -227,12 +228,12 @@ func validRoundChangeForData(
 		return errors.New("msg allows 1 signer")
 	}
 
-	if err := signedMsg.Signature.VerifyByOperators(signedMsg, config.GetSignatureDomainType(), types.QBFTSignatureType, state.Share.Committee); err != nil {
-		return errors.Wrap(err, "msg signature invalid")
+	if err := signedMsg.Validate(); err != nil {
+		return errors.Wrap(err, "roundChange invalid")
 	}
 
-	if err := signedMsg.Message.Validate(); err != nil {
-		return errors.Wrap(err, "roundChange invalid")
+	if !signedMsg.CheckSignersInCommittee(state.Share.Committee) {
+		return errors.New("signers not in committee")
 	}
 
 	// Addition to formal spec
@@ -246,7 +247,7 @@ func validRoundChangeForData(
 		// validate prepare message justifications
 		prepareMsgs, _ := signedMsg.Message.GetRoundChangeJustifications() // no need to check error, checked on signedMsg.Message.Validate()
 		for _, pm := range prepareMsgs {
-			if err := validSignedPrepareForHeightRoundAndRoot(
+			if err := validSignedPrepareForHeightRoundAndRootWithVerification(
 				config,
 				pm,
 				state.Height,
@@ -271,6 +272,28 @@ func validRoundChangeForData(
 
 		return nil
 	}
+
+	return nil
+}
+
+func validRoundChangeForDataWithVerification(
+	state *State,
+	config IConfig,
+	signedMsg *SignedMessage,
+	height Height,
+	round Round,
+	fullData []byte,
+) error {
+
+	if err := validRoundChangeForDataNoVerification(state, config, signedMsg, height, round, fullData); err != nil {
+		return err
+	}
+
+	// Verify signature
+	if err := signedMsg.Signature.VerifyByOperators(signedMsg, config.GetSignatureDomainType(), types.QBFTSignatureType, state.Share.Committee); err != nil {
+		return errors.Wrap(err, "msg signature invalid")
+	}
+
 	return nil
 }
 

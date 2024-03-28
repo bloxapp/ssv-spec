@@ -2,6 +2,7 @@ package qbft
 
 import (
 	"bytes"
+
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/pkg/errors"
 )
@@ -94,8 +95,7 @@ func CreateCommit(state *State, config IConfig, root [32]byte) (*SignedMessage, 
 	return signedMsg, nil
 }
 
-func baseCommitValidation(
-	config IConfig,
+func baseCommitValidationNoVerification(
 	signedCommit *SignedMessage,
 	height Height,
 	operators []*types.Operator,
@@ -111,6 +111,24 @@ func baseCommitValidation(
 		return errors.Wrap(err, "signed commit invalid")
 	}
 
+	if !signedCommit.CheckSignersInCommittee(operators) {
+		return errors.New("signers not in committee")
+	}
+
+	return nil
+}
+
+func baseCommitValidationWithVerification(
+	config IConfig,
+	signedCommit *SignedMessage,
+	height Height,
+	operators []*types.Operator,
+) error {
+
+	if err := baseCommitValidationNoVerification(signedCommit, height, operators); err != nil {
+		return err
+	}
+
 	// verify signature
 	if err := signedCommit.Signature.VerifyByOperators(signedCommit, config.GetSignatureDomainType(), types.QBFTSignatureType, operators); err != nil {
 		return errors.Wrap(err, "msg signature invalid")
@@ -120,14 +138,13 @@ func baseCommitValidation(
 }
 
 func validateCommit(
-	config IConfig,
 	signedCommit *SignedMessage,
 	height Height,
 	round Round,
 	proposedMsg *SignedMessage,
 	operators []*types.Operator,
 ) error {
-	if err := baseCommitValidation(config, signedCommit, height, operators); err != nil {
+	if err := baseCommitValidationNoVerification(signedCommit, height, operators); err != nil {
 		return err
 	}
 

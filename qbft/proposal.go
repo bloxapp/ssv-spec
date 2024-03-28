@@ -2,6 +2,7 @@ package qbft
 
 import (
 	"bytes"
+
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/pkg/errors"
 )
@@ -60,9 +61,11 @@ func isValidProposal(
 	if len(signedProposal.GetSigners()) != 1 {
 		return errors.New("msg allows 1 signer")
 	}
-	if err := signedProposal.Signature.VerifyByOperators(signedProposal, config.GetSignatureDomainType(), types.QBFTSignatureType, operators); err != nil {
-		return errors.Wrap(err, "msg signature invalid")
+
+	if !signedProposal.CheckSignersInCommittee(state.Share.Committee) {
+		return errors.New("signers not in committee")
 	}
+
 	if !signedProposal.MatchedSigners([]types.OperatorID{proposer(state, config, signedProposal.Message.Round)}) {
 		return errors.New("proposal leader invalid")
 	}
@@ -126,7 +129,7 @@ func isProposalJustification(
 		// no quorum, duplicate signers,  invalid still has quorum, invalid no quorum
 		// prepared
 		for _, rc := range roundChangeMsgs {
-			if err := validRoundChangeForData(state, config, rc, height, round, fullData); err != nil {
+			if err := validRoundChangeForDataWithVerification(state, config, rc, height, round, fullData); err != nil {
 				return errors.Wrap(err, "change round msg not valid")
 			}
 		}
@@ -178,7 +181,7 @@ func isProposalJustification(
 
 			// validate each prepare message against the highest previously prepared fullData and round
 			for _, pm := range prepareMsgs {
-				if err := validSignedPrepareForHeightRoundAndRoot(
+				if err := validSignedPrepareForHeightRoundAndRootWithVerification(
 					config,
 					pm,
 					height,
