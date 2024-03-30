@@ -76,31 +76,40 @@ func (r *AggregatorRunner) ProcessPreConsensus(signedMsg *types.SignedPartialSig
 		return errors.Wrap(err, "got pre-consensus quorum but it has invalid signatures")
 	}
 
-	duty := r.GetState().StartingDuty
-
 	// TODO waitToSlotTwoThirds
 
-	// get block data
-	res, ver, err := r.GetBeaconNode().SubmitAggregateSelectionProof(duty.Slot, duty.CommitteeIndex, duty.CommitteeLength, duty.ValidatorIndex, fullSig)
-	if err != nil {
-		return errors.Wrap(err, "failed to submit aggregate and proof")
-	}
-
-	byts, err := res.MarshalSSZ()
-	if err != nil {
-		return errors.Wrap(err, "could not marshal aggregate and proof")
-	}
-	input := &types.ConsensusData{
-		Duty:    *duty,
-		Version: ver,
-		DataSSZ: byts,
-	}
-
-	if err := r.BaseRunner.decide(r, input); err != nil {
+	aggregationFetcher := aggregationFetcher(r, fullSig)
+	if err := r.BaseRunner.decide(r, aggregationFetcher); err != nil {
 		return errors.Wrap(err, "can't start new duty runner instance for duty")
 	}
 
 	return nil
+}
+
+func aggregationFetcher(r *AggregatorRunner, fullSig []byte) *types.DataFetcher {
+	duty := r.GetState().StartingDuty
+	return &types.DataFetcher{
+		GetConsensusData: func() ([]byte, error) {
+			aggData, ver, err := r.GetBeaconNode().SubmitAggregateSelectionProof(duty.Slot, duty.CommitteeIndex,
+				duty.CommitteeLength, duty.ValidatorIndex, fullSig)
+
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to submit aggregate and proof")
+			}
+
+			aggDataByts, err := aggData.MarshalSSZ()
+			if err != nil {
+				return nil, errors.Wrap(err, "could not marshal aggregate and proof")
+			}
+
+			cd := types.ConsensusData{
+				Duty:    *duty,
+				Version: ver,
+				DataSSZ: aggDataByts,
+			}
+			return cd.Encode()
+		},
+	}
 }
 
 func (r *AggregatorRunner) ProcessConsensus(signedMsg *qbft.SignedMessage) error {

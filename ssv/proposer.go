@@ -80,40 +80,51 @@ func (r *ProposerRunner) ProcessPreConsensus(signedMsg *types.SignedPartialSigna
 		return errors.Wrap(err, "got pre-consensus quorum but it has invalid signatures")
 	}
 
-	duty := r.GetState().StartingDuty
+	beaconBlockFetcher := beaconBlockFetcher(r, fullSig)
 
-	var ver spec.DataVersion
-	var obj ssz.Marshaler
-	if r.ProducesBlindedBlocks {
-		// get block data
-		obj, ver, err = r.GetBeaconNode().GetBlindedBeaconBlock(duty.Slot, r.GetShare().Graffiti, fullSig)
-		if err != nil {
-			return errors.Wrap(err, "failed to get Beacon block")
-		}
-	} else {
-		// get block data
-		obj, ver, err = r.GetBeaconNode().GetBeaconBlock(duty.Slot, r.GetShare().Graffiti, fullSig)
-		if err != nil {
-			return errors.Wrap(err, "failed to get Beacon block")
-		}
-	}
-
-	byts, err := obj.MarshalSSZ()
-	if err != nil {
-		return errors.Wrap(err, "could not marshal beacon block")
-	}
-
-	input := &types.ConsensusData{
-		Duty:    *duty,
-		Version: ver,
-		DataSSZ: byts,
-	}
-
-	if err := r.BaseRunner.decide(r, input); err != nil {
+	if err := r.BaseRunner.decide(r, beaconBlockFetcher); err != nil {
 		return errors.Wrap(err, "can't start new duty runner instance for duty")
 	}
 
 	return nil
+}
+
+func beaconBlockFetcher(r *ProposerRunner, fullSig []byte) *types.DataFetcher {
+	return &types.DataFetcher{
+		GetConsensusData: func() ([]byte, error) {
+			duty := r.GetState().StartingDuty
+
+			var ver spec.DataVersion
+			var obj ssz.Marshaler
+			var err error
+
+			if r.ProducesBlindedBlocks {
+				// get block data
+				obj, ver, err = r.GetBeaconNode().GetBlindedBeaconBlock(duty.Slot, r.GetShare().Graffiti, fullSig)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get Beacon block")
+				}
+			} else {
+				// get block data
+				obj, ver, err = r.GetBeaconNode().GetBeaconBlock(duty.Slot, r.GetShare().Graffiti, fullSig)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get Beacon block")
+				}
+			}
+
+			byts, err := obj.MarshalSSZ()
+			if err != nil {
+				return nil, errors.Wrap(err, "could not marshal beacon block")
+			}
+
+			cd := types.ConsensusData{
+				Duty:    *duty,
+				Version: ver,
+				DataSSZ: byts,
+			}
+			return cd.Encode()
+		},
+	}
 }
 
 func (r *ProposerRunner) ProcessConsensus(signedMsg *qbft.SignedMessage) error {

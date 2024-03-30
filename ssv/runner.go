@@ -218,19 +218,10 @@ func (b *BaseRunner) didDecideCorrectly(prevDecided bool, decidedMsg *qbft.Signe
 	return true, nil
 }
 
-func (b *BaseRunner) decide(runner Runner, input *types.ConsensusData) error {
-	byts, err := input.Encode()
-	if err != nil {
-		return errors.Wrap(err, "could not encode ConsensusData")
-	}
-
-	if err := runner.GetValCheckF()(byts); err != nil {
-		return errors.Wrap(err, "input data invalid")
-	}
-
+func (b *BaseRunner) decide(runner Runner, cdFetcher *types.DataFetcher) error {
 	if err := runner.GetBaseRunner().QBFTController.StartNewInstance(
-		qbft.Height(input.Duty.Slot),
-		byts,
+		qbft.Height(runner.GetBaseRunner().State.StartingDuty.Slot),
+		cdFetcher,
 	); err != nil {
 		return errors.Wrap(err, "could not start new QBFT instance")
 	}
